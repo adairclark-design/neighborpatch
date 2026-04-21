@@ -11,6 +11,8 @@ export default function InboxPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [convos, setConvos] = useState<any[]>([]);
   const [activeConvo, setActiveConvo] = useState<any>(null);
+  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
   
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
@@ -25,7 +27,7 @@ export default function InboxPage() {
       // Fetch all messages involving the user
       const { data: rawMessages } = await supabase
         .from('messages')
-        .select('*, sender:sender_id(full_name), recipient:recipient_id(full_name), plot:plot_id(title, id)')
+        .select('*, sender:sender_id(full_name), recipient:recipient_id(full_name), plot:plot_id(title, id, owner_id)')
         .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
         .order('created_at', { ascending: true });
 
@@ -47,6 +49,7 @@ export default function InboxPage() {
               initials: (otherUserName || "U").substring(0,2).toUpperCase(),
               plotId: msg.plot_id,
               plotName: msg.plot?.title || "Unknown Plot",
+              plotOwnerId: msg.plot?.owner_id,
               messages: []
             });
           }
@@ -83,10 +86,30 @@ export default function InboxPage() {
   }, []);
 
   useEffect(() => {
-    if (activeConvo) {
+    if (activeConvo && currentUser) {
       setMessages(activeConvo.messages);
+      
+      // Determine the applicant (it's the person who isn't the owner)
+      const isOwner = activeConvo.plotOwnerId === currentUser.id;
+      const applicantId = isOwner ? activeConvo.otherUserId : currentUser.id;
+
+      // Fetch application status
+      supabase.from('applications')
+        .select('id, status')
+        .eq('plot_id', activeConvo.plotId)
+        .eq('applicant_id', applicantId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setApplicationStatus(data.status);
+            setApplicationId(data.id);
+          } else {
+            setApplicationStatus(null);
+            setApplicationId(null);
+          }
+        });
     }
-  }, [activeConvo]);
+  }, [activeConvo, currentUser]);
 
   const send = async () => {
     if (!input.trim() || !activeConvo || !currentUser) return;
@@ -101,6 +124,25 @@ export default function InboxPage() {
       body: bodyText
     });
     // The postgres listener will trigger a refresh.
+  };
+
+  const handleAcceptGardener = async () => {
+    if (!applicationId || !activeConvo || !currentUser) return;
+    
+    // 1. Update application status
+    await supabase.from('applications').update({ status: 'approved' }).eq('id', applicationId);
+    // 2. Update plot status
+    await supabase.from('plots').update({ status: 'occupied' }).eq('id', activeConvo.plotId);
+    // 3. Send system message
+    await supabase.from('messages').insert({
+      sender_id: currentUser.id,
+      recipient_id: activeConvo.otherUserId,
+      plot_id: activeConvo.plotId,
+      body: "SYSTEM: Application Approved! The plot is now yours to farm. Contracts have been fully executed."
+    });
+
+    setApplicationStatus('approved');
+    alert("Application successfully approved! The plot has been secured.");
   };
 
   return (
@@ -156,10 +198,14 @@ export default function InboxPage() {
                   <div className="text-xs color-muted">Re: {activeConvo.plotName}</div>
                 </div>
                 <div className="flex gap-8">
-                  {addressRevealed
-                    ? <span className="badge badge-green">📍 Address Revealed</span>
-                    : <button className="btn btn-sm" style={{ background: "var(--brand-earth-light)", color: "var(--brand-earth)" }} onClick={() => setAddressRevealed(true)}>Reveal Address</button>
-                  }
+                  {activeConvo.plotOwnerId === currentUser?.id && applicationStatus === 'pending' && (
+                    <button className="btn btn-sm" style={{ background: "var(--brand-green)", color: "white" }} onClick={handleAcceptGardener}>
+                      ✓ Accept Gardener
+                    </button>
+                  )}
+                  {applicationStatus === 'approved' && (
+                    <span className="badge badge-green">Contract Active</span>
+                  )}
                   <button className="btn btn-secondary btn-sm" onClick={() => router.push("/dashboard/contracts/sign")}>View Agreement</button>
                 </div>
               </div>

@@ -13,14 +13,28 @@ export default function ApplyPage() {
   const [plot, setPlot] = useState<any>(null);
   const [pitch, setPitch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [surveyBlocked, setSurveyBlocked] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Load the plot data to confirm who we are messaging
-    const fetchPlot = async () => {
+    const check = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Gate: Check if gardener has completed their reliability survey
+      const { data: profile } = await supabase.from('profiles').select('survey_complete').eq('id', user.id).single();
+      if (!profile?.survey_complete) {
+        setSurveyBlocked(true);
+        setChecking(false);
+        return;
+      }
+
+      // Load the plot data
       const { data } = await supabase.from('plots').select('*, profiles:owner_id (full_name)').eq('id', plotId).single();
       if (data) setPlot(data);
+      setChecking(false);
     };
-    fetchPlot();
+    check();
   }, [plotId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,6 +74,35 @@ export default function ApplyPage() {
     router.push("/dashboard/inbox");
   };
 
+  if (checking) {
+    return (
+      <div className="page-shell"><Sidebar />
+        <main className="main-content" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="color-muted">Checking your profile...</div>
+        </main>
+      </div>
+    );
+  }
+
+  if (surveyBlocked) {
+    return (
+      <div className="page-shell"><Sidebar />
+        <main className="main-content" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="card" style={{ maxWidth: 480, textAlign: "center", display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ fontSize: "3rem" }}>🌱</div>
+            <h2>Complete Your Gardener Profile First</h2>
+            <p className="color-muted text-sm">
+              Before applying to farm any land, homeowners need to understand who you are and how you garden. Your profile takes about 5 minutes and is required once.
+            </p>
+            <button className="btn btn-primary" onClick={() => router.push("/survey")}>
+              Begin My Gardener Profile →
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="page-shell">
       <Sidebar />
@@ -93,3 +136,4 @@ export default function ApplyPage() {
     </div>
   );
 }
+

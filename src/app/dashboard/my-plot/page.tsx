@@ -1,10 +1,23 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import { supabase } from "@/lib/supabase";
 
 export default function MyPlotPage() {
   const router = useRouter();
+  const [isOwner, setIsOwner] = useState(false);
+  const [isRevoked, setIsRevoked] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.from('profiles').select('role').eq('id', user.id).single()
+          .then(({ data }) => setIsOwner(data?.role === 'owner'));
+      }
+    });
+  }, []);
 
   return (
     <div className="page-shell">
@@ -28,17 +41,31 @@ export default function MyPlotPage() {
             <div className="card">
               <h3 className="mb-16">Quick Actions</h3>
               <div className="grid-2">
-                <button 
-                  className="btn btn-primary btn-full"
-                  onClick={() => router.push("/dashboard/plot/123/log")}
-                >
-                  📝 Log Harvest
-                </button>
+                {!isOwner ? (
+                  <button 
+                    className="btn btn-primary btn-full"
+                    onClick={() => router.push("/dashboard/plot/123/log")}
+                  >
+                    📝 Log Harvest
+                  </button>
+                ) : (
+                  <button 
+                    className="btn btn-full"
+                    style={{ background: "#fee2e2", color: "#ef4444", border: "1px solid #fca5a5" }}
+                    onClick={() => {
+                        setIsRevoked(true);
+                        // Future: supabase.from('applications').update({ status: 'revoked' })...
+                        alert("Gate access revoked. The gardener has been notified.");
+                    }}
+                  >
+                    🛑 Revoke Gate Access
+                  </button>
+                )}
                 <button 
                   className="btn btn-secondary btn-full"
                   onClick={() => router.push("/dashboard/inbox")}
                 >
-                  💬 Message Owner
+                  💬 Message {isOwner ? "Gardener" : "Owner"}
                 </button>
               </div>
             </div>

@@ -4,9 +4,11 @@ import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
+import { supabase } from "@/lib/supabase";
+
 // In a real app, this goes in .env.local
-// mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-mapboxgl.accessToken = "pk.eyJ1IjoiYWRhaXciLCJhIjoiY2x0ZHpsZ29hMGswYTJpcGN2Zml2eWZ2ZiJ9.TEST_TOKEN"; 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+mapboxgl.accessToken = MAPBOX_TOKEN; 
 
 interface Plot {
   id: string;
@@ -21,22 +23,43 @@ export default function FuzzedMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   
-  // Dummy Seed Data localized to Austin, TX as per assumption
-  const [plots] = useState<Plot[]>([
-    { id: "1", title: "0.2 Acres - East Austin", fuzzed_lat: 30.2672, fuzzed_lng: -97.7431, monthly_fee: 25, is_verified: true },
-    { id: "2", title: "Large Backyard Patch", fuzzed_lat: 30.2849, fuzzed_lng: -97.7341, monthly_fee: 0, is_verified: false },
-    { id: "3", title: "Sunny Front Yard", fuzzed_lat: 30.2415, fuzzed_lng: -97.7687, monthly_fee: 15, is_verified: true }
-  ]);
+  const [plots, setPlots] = useState<Plot[]>([]);
+
+  useEffect(() => {
+    // Fetch live fuzzed plots from DB
+    const fetchPlots = async () => {
+      const { data, error } = await supabase.from('plots').select('id, title, utility_fee_monthly, status, fuzzed_location').in('status', ['available']);
+      if (error || !data) return;
+
+      const livePlots: Plot[] = data.map((plot) => {
+        // PostGIS usually returns a GeoJSON geometry object for Point types: { coordinates: [lng, lat] }
+        // If it isn't set, we skip or use fallback.
+        const coords = (plot.fuzzed_location as any)?.coordinates;
+        return {
+          id: plot.id,
+          title: plot.title,
+          fuzzed_lng: coords ? coords[0] : 0,
+          fuzzed_lat: coords ? coords[1] : 0,
+          monthly_fee: plot.utility_fee_monthly || 0,
+          is_verified: true, // we will pull this from profiles relation later 
+        };
+      }).filter(p => p.fuzzed_lng !== 0);
+      
+      setPlots(livePlots);
+    };
+    fetchPlots();
+  }, []);
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
+    if (plots.length === 0) return; // Wait until we have plots to render them
 
-    // Initialize to Austin, TX
+    // Initialize to Austin, TX (or the first plot)
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/outdoors-v12",
-      center: [-97.7431, 30.2672],
-      zoom: 12
+      center: [plots[0]?.fuzzed_lng || -97.7431, plots[0]?.fuzzed_lat || 30.2672],
+      zoom: 11
     });
 
     map.current.on("load", () => {
@@ -92,7 +115,7 @@ export default function FuzzedMap() {
     <div style={{ position: "relative", width: "100%", height: "400px", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
       <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
       <div style={{ position: "absolute", top: 10, left: 10, background: "white", padding: "8px 12px", borderRadius: "100px", fontSize: "0.8rem", boxShadow: "var(--shadow-md)" }}>
-        📍 Showing 3 available plots near Austin, TX
+        📍 Showing {plots.length} available plot{plots.length === 1 ? "" : "s"} near {plots.length > 0 ? "your area" : "you"}
       </div>
     </div>
   );

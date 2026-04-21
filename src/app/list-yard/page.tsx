@@ -11,6 +11,7 @@ export default function ListYardPage() {
   const [title, setTitle] = useState("");
   const [sqft, setSqft] = useState("");
   const [model, setModel] = useState<"crop_share" | "flat_fee">("crop_share");
+  const [interaction, setInteraction] = useState<"collaborative" | "silent">("collaborative");
   const [rules, setRules] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -24,13 +25,39 @@ export default function ListYardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("You must be logged in to list a yard.");
 
+      // 1. Geocode via Mapbox
+      const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+      const geoUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`;
+      
+      const geoRes = await fetch(geoUrl);
+      const geoData = await geoRes.json();
+      
+      if (!geoData.features || geoData.features.length === 0) {
+        throw new Error("Could not map this address. Please ensure it is valid.");
+      }
+      
+      // Coordinates are [longitude, latitude]
+      const [lng, lat] = geoData.features[0].center;
+
+      // 2. Mathematically Fuzz the location by approx 0.5 miles (0.007 degrees)
+      const offsetLng = (Math.random() - 0.5) * 0.014;
+      const offsetLat = (Math.random() - 0.5) * 0.014;
+      const fuzzed_lng = lng + offsetLng;
+      const fuzzed_lat = lat + offsetLat;
+
+      // Format as Well-Known Text (WKT) for PostGIS
+      const exact_wkt = `POINT(${lng} ${lat})`;
+      const fuzzed_wkt = `POINT(${fuzzed_lng} ${fuzzed_lat})`;
+
       const { error: insertError } = await supabase.from("plots").insert({
         owner_id: user.id,
         title,
         description: rules,
         compensation_model: model,
+        interaction_preference: interaction,
         status: "available",
-        // Geographic insert will be wired in Phase 3.3 when Mapbox geocoding is added
+        exact_location: exact_wkt,
+        fuzzed_location: fuzzed_wkt
       });
       if (insertError) throw insertError;
       setSubmitted(true);
@@ -113,6 +140,28 @@ export default function ListYardPage() {
                         <div style={{ fontSize: "1.4rem", marginBottom: 8 }}>💧</div>
                         <div className="font-semibold" style={{ fontSize: "0.88rem", color: model === "flat_fee" ? "var(--brand-green)" : "var(--text-primary)" }}>Flat Utility Fee</div>
                         <p className="text-xs mt-4">Gardener pays $25/month to cover your water bill.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="field mb-20">
+                    <label>Social Preference</label>
+                    <div className="grid-2" style={{ gap: "12px", marginTop: "6px" }}>
+                      <div
+                        onClick={() => setInteraction("collaborative")}
+                        style={{ padding: "16px", borderRadius: "var(--radius-md)", border: `2px solid ${interaction === "collaborative" ? "var(--brand-green)" : "var(--border)"}`, background: interaction === "collaborative" ? "var(--brand-green-pale)" : "white", cursor: "pointer", transition: "all var(--transition)" }}
+                      >
+                        <div style={{ fontSize: "1.4rem", marginBottom: 8 }}>🤝</div>
+                        <div className="font-semibold" style={{ fontSize: "0.88rem", color: interaction === "collaborative" ? "var(--brand-green)" : "var(--text-primary)" }}>Collaborative</div>
+                        <p className="text-xs mt-4">I'm happy to chat and meet the gardener.</p>
+                      </div>
+                      <div
+                        onClick={() => setInteraction("silent")}
+                        style={{ padding: "16px", borderRadius: "var(--radius-md)", border: `2px solid ${interaction === "silent" ? "var(--brand-green)" : "var(--border)"}`, background: interaction === "silent" ? "var(--brand-green-pale)" : "white", cursor: "pointer", transition: "all var(--transition)" }}
+                      >
+                        <div style={{ fontSize: "1.4rem", marginBottom: 8 }}>🤫</div>
+                        <div className="font-semibold" style={{ fontSize: "0.88rem", color: interaction === "silent" ? "var(--brand-green)" : "var(--text-primary)" }}>Silent Partner</div>
+                        <p className="text-xs mt-4">Do not knock. Just farm the yard and leave.</p>
                       </div>
                     </div>
                   </div>

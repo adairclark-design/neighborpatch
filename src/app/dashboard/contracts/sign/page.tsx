@@ -62,11 +62,15 @@ export default function SignAgreement() {
                 The Gardener agrees to leave a weekly basket of fresh produce for the Homeowners as a good-faith gesture of community and abundance. All harvest activity will be logged to the shared Harvest Log within 24 hours.
               </section>
               <section style={{ marginBottom: "18px" }}>
-                <strong style={{ color: "var(--text-primary)", display: "block", marginBottom: 4 }}>V. HOMEOWNER OBLIGATIONS</strong>
+                <strong style={{ color: "var(--text-primary)", display: "block", marginBottom: 4 }}>V. THE NEIGHBORPATCH GUARANTEE</strong>
+                NeighborPatch sets aside 10% of all utility fees into a shared <strong>Property Damage Protection Pool</strong>. In the rare event of minor landscaping damage directly caused by the Gardener, the Homeowners may file a claim up to $500 for repair reimbursement. Note: This does not replace traditional home insurance.
+              </section>
+              <section style={{ marginBottom: "18px" }}>
+                <strong style={{ color: "var(--text-primary)", display: "block", marginBottom: 4 }}>VI. HOMEOWNER OBLIGATIONS</strong>
                 The Homeowners agree to honor this License for the duration of one full growing season. If the property is sold, the new owner is notified of this License at closing. The Homeowners must provide 30 days written notice via the platform before early termination.
               </section>
               <section>
-                <strong style={{ color: "var(--text-primary)", display: "block", marginBottom: 4 }}>VI. GARDENER OBLIGATIONS & EXIT</strong>
+                <strong style={{ color: "var(--text-primary)", display: "block", marginBottom: 4 }}>VII. GARDENER OBLIGATIONS & EXIT</strong>
                 The Gardener agrees to either (A) find a qualified replacement gardener before the end of the season, or (B) return the plot to a clear, grass-seeded state within 30 days. Soil amendments made cooperatively are not subject to reimbursement.
               </section>
             </div>

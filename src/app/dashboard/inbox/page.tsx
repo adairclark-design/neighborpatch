@@ -14,6 +14,9 @@ export default function InboxPage() {
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   
+  const [gardenerSurvey, setGardenerSurvey] = useState<any>(null);
+  const [isResumeOpen, setIsResumeOpen] = useState(false);
+  
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
   const [addressRevealed, setAddressRevealed] = useState(false);
@@ -108,6 +111,15 @@ export default function InboxPage() {
             setApplicationId(null);
           }
         });
+
+      // Fetch Gardener Survey data (only relevant if we are reading a gardener's application)
+      supabase.from('gardener_surveys')
+        .select('*')
+        .eq('gardener_id', applicantId)
+        .single()
+        .then(({ data }) => {
+          setGardenerSurvey(data || null);
+        });
     }
   }, [activeConvo, currentUser]);
 
@@ -145,11 +157,95 @@ export default function InboxPage() {
     alert("Application successfully approved! The plot has been secured.");
   };
 
+  const renderPills = (arr: string[]) => {
+    if (!arr || arr.length === 0) return <span className="color-muted text-sm">None selected</span>;
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {arr.map((item, i) => (
+          <span key={i} style={{ background: "var(--bg-muted)", padding: "4px 10px", borderRadius: "100px", fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+            {item}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="page-shell">
       <Sidebar />
       <main className="main-content" style={{ padding: 0, display: "flex", flexDirection: "column" }}>
         
+        {/* Gardener Resume Modal */}
+        {isResumeOpen && gardenerSurvey && (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }}>
+            <div className="card fade-up" style={{ width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
+              <button 
+                onClick={() => setIsResumeOpen(false)}
+                style={{ position: "absolute", top: 16, right: 16, background: "transparent", border: "none", fontSize: "1.2rem", cursor: "pointer", color: "var(--color-muted)" }}
+              >
+                ✕
+              </button>
+              
+              <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: 20, marginBottom: 20 }}>
+                <h2 style={{ marginBottom: 8 }}>{activeConvo?.name || "Gardener"}</h2>
+                {gardenerSurvey.hotoku_pledge && (
+                  <span className="badge badge-green" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <span>🌱</span> Hotoku Community Pledge Signed
+                  </span>
+                )}
+              </div>
+
+              {gardenerSurvey.personal_statement && (
+                <div style={{ marginBottom: 24, fontStyle: "italic", color: "var(--text-secondary)", lineHeight: 1.6, padding: "16px", background: "var(--bg-muted)", borderRadius: "8px", borderLeft: "4px solid var(--brand-green)" }}>
+                  "{gardenerSurvey.personal_statement}"
+                </div>
+              )}
+
+              <div className="grid-2" style={{ gap: 24, marginBottom: 24 }}>
+                <div>
+                  <h4 className="mb-8 text-sm">Motivations</h4>
+                  {renderPills(gardenerSurvey.motivations)}
+                </div>
+                <div>
+                  <h4 className="mb-8 text-sm">Experience</h4>
+                  <div className="text-sm color-secondary">
+                    Total: <strong>{gardenerSurvey.gardening_years || "N/A"}</strong><br />
+                    Serious: <strong>{gardenerSurvey.serious_gardening_years || "N/A"}</strong><br />
+                    Patio/Deck: <strong>{gardenerSurvey.deck_experience || "N/A"}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <h4 className="mb-8 text-sm">What they want to grow</h4>
+                {renderPills(gardenerSurvey.crops_to_grow)}
+              </div>
+
+              <div className="grid-2" style={{ gap: 24, marginBottom: 24 }}>
+                <div>
+                  <h4 className="mb-8 text-sm">Familiar Techniques</h4>
+                  {renderPills(gardenerSurvey.techniques)}
+                </div>
+                <div>
+                  <h4 className="mb-8 text-sm">Compost / Soil Knowledge</h4>
+                  {renderPills(gardenerSurvey.composting_practices)}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <h4 className="mb-8 text-sm">Tools Owned</h4>
+                {renderPills(gardenerSurvey.tools_owned)}
+              </div>
+
+              {gardenerSurvey.willing_chicken_care && (
+                <div className="badge badge-green" style={{ display: "inline-block" }}>
+                  🐔 Willing to help with backyard chickens/quail
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Page header */}
         <div style={{ padding: "32px 40px 20px", borderBottom: "1px solid var(--border)" }}>
           <h2>Inbox</h2>
@@ -201,6 +297,11 @@ export default function InboxPage() {
                   {activeConvo.plotOwnerId === currentUser?.id && applicationStatus === 'pending' && (
                     <button className="btn btn-sm" style={{ background: "var(--brand-green)", color: "white" }} onClick={handleAcceptGardener}>
                       ✓ Accept Gardener
+                    </button>
+                  )}
+                  {gardenerSurvey && (
+                    <button className="btn btn-secondary btn-sm" onClick={() => setIsResumeOpen(true)}>
+                      📄 View Gardener Profile
                     </button>
                   )}
                   {applicationStatus === 'approved' && (

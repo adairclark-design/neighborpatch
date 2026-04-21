@@ -57,6 +57,34 @@ export default function MyPlotPage() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  const handleEviction = async () => {
+    if (!activePlot) return;
+    if (!window.confirm("Are you sure you want to revoke gate access? This will permanently sever the digital contract and re-list your yard.")) return;
+    
+    // 1. Fetch the active gardener attached to this plot
+    const { data: appData } = await supabase.from('applications').select('id, applicant_id').eq('plot_id', activePlot.id).eq('status', 'approved').single();
+    if (!appData) return;
+
+    // 2. Set applications row to 'revoked'
+    await supabase.from('applications').update({ status: 'revoked' }).eq('id', appData.id);
+
+    // 3. Set plot status back to 'available'
+    await supabase.from('plots').update({ status: 'available' }).eq('id', activePlot.id);
+
+    // 4. Send System Notification
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('messages').insert({
+      sender_id: user?.id,
+      recipient_id: appData.applicant_id,
+      plot_id: activePlot.id,
+      body: "SYSTEM: Your farming contract has been revoked by the property owner. Gate access is terminated immediately."
+    });
+
+    setIsRevoked(true);
+    setActivePlot(null); // Force empty state UI
+    alert("Gate access revoked. The yard has been re-listed.");
+  };
+
   if (loading) {
     return (
       <div className="page-shell">
@@ -73,9 +101,18 @@ export default function MyPlotPage() {
       <div className="page-shell">
         <Sidebar />
         <main className="main-content" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ textAlign: "center", color: "var(--color-muted)" }}>
-            <h2>No Active Plot</h2>
-            <p>You currently do not have an active farming contract bound to a plot.</p>
+          <div className="card" style={{ maxWidth: 400, textAlign: "center", display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ fontSize: "3rem" }}>{isOwner ? "🏡" : "🌱"}</div>
+            <h2>{isOwner ? "Your yard is currently undiscovered." : "You haven't secured a farm contract yet."}</h2>
+            <p className="color-muted text-sm">
+              {isOwner ? "List your empty space on the map to find reliable gardeners." : "Browse the map to pitch local homeowners and secure your first plot."}
+            </p>
+            <button 
+              className="btn btn-primary mt-16"
+              onClick={() => router.push(isOwner ? "/list-yard" : "/")}
+            >
+              {isOwner ? "📌 List Yard on Map" : "🗺️ Explore the Map"}
+            </button>
           </div>
         </main>
       </div>
@@ -115,10 +152,7 @@ export default function MyPlotPage() {
                   <button 
                     className="btn btn-full"
                     style={{ background: "#fee2e2", color: "#ef4444", border: "1px solid #fca5a5" }}
-                    onClick={() => {
-                        setIsRevoked(true);
-                        alert("Gate access revoked. The gardener has been notified.");
-                    }}
+                    onClick={handleEviction}
                   >
                     🛑 Revoke Gate Access
                   </button>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import { supabase } from "@/lib/supabase";
 
 export default function ListYardPage() {
   const router = useRouter();
@@ -12,10 +13,32 @@ export default function ListYardPage() {
   const [model, setModel] = useState<"crop_share" | "flat_fee">("crop_share");
   const [rules, setRules] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!address || !title) return;
-    setSubmitted(true);
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You must be logged in to list a yard.");
+
+      const { error: insertError } = await supabase.from("plots").insert({
+        owner_id: user.id,
+        title,
+        description: rules,
+        compensation_model: model,
+        status: "available",
+        // Geographic insert will be wired in Phase 3.3 when Mapbox geocoding is added
+      });
+      if (insertError) throw insertError;
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -31,6 +54,12 @@ export default function ListYardPage() {
                 <p>Your exact address stays private. Only verified, ID-checked gardeners who you personally approve will ever see it.</p>
               </div>
             </div>
+
+            {error && (
+              <div style={{ padding: "12px 16px", background: "#fee2e2", color: "#ef4444", borderRadius: "var(--radius-md)", fontSize: "0.875rem", marginBottom: 16 }}>
+                ⚠️ {error}
+              </div>
+            )}
 
             <div className="grid-2 fade-up fade-up-1" style={{ alignItems: "start" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -93,8 +122,8 @@ export default function ListYardPage() {
                     <textarea className="input" placeholder="No synthetic pesticides, lock the side gate when leaving, organic fertilizers only..." value={rules} onChange={e => setRules(e.target.value)} />
                   </div>
 
-                  <button className="btn btn-primary btn-full" disabled={!address || !title} onClick={handleSubmit} style={{ opacity: !address || !title ? 0.5 : 1 }}>
-                    List My Yard Securely 🌱
+                  <button className="btn btn-primary btn-full" disabled={!address || !title || loading} onClick={handleSubmit} style={{ opacity: !address || !title ? 0.5 : 1 }}>
+                    {loading ? "Listing your yard..." : "List My Yard Securely 🌱"}
                   </button>
                 </div>
               </div>

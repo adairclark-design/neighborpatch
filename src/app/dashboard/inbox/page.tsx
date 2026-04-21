@@ -13,9 +13,12 @@ export default function InboxPage() {
   const [activeConvo, setActiveConvo] = useState<any>(null);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [applicationData, setApplicationData] = useState<any>(null);
   
   const [gardenerSurvey, setGardenerSurvey] = useState<any>(null);
   const [isResumeOpen, setIsResumeOpen] = useState(false);
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [signatureInput, setSignatureInput] = useState("");
   
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
@@ -98,7 +101,7 @@ export default function InboxPage() {
 
       // Fetch application status
       supabase.from('applications')
-        .select('id, status')
+        .select('id, status, owner_signature, gardener_signature, license_agreed_at')
         .eq('plot_id', activeConvo.plotId)
         .eq('applicant_id', applicantId)
         .single()
@@ -106,9 +109,11 @@ export default function InboxPage() {
           if (data) {
             setApplicationStatus(data.status);
             setApplicationId(data.id);
+            setApplicationData(data);
           } else {
             setApplicationStatus(null);
             setApplicationId(null);
+            setApplicationData(null);
           }
         });
 
@@ -138,23 +143,49 @@ export default function InboxPage() {
     // The postgres listener will trigger a refresh.
   };
 
-  const handleAcceptGardener = async () => {
-    if (!applicationId || !activeConvo || !currentUser) return;
+  const handleSignContract = async () => {
+    if (!applicationId || !activeConvo || !currentUser || !signatureInput.trim()) return;
     
-    // 1. Update application status
-    await supabase.from('applications').update({ status: 'approved' }).eq('id', applicationId);
-    // 2. Update plot status
-    await supabase.from('plots').update({ status: 'occupied' }).eq('id', activeConvo.plotId);
-    // 3. Send system message
-    await supabase.from('messages').insert({
-      sender_id: currentUser.id,
-      recipient_id: activeConvo.otherUserId,
-      plot_id: activeConvo.plotId,
-      body: "SYSTEM: Application Approved! The plot is now yours to farm. Contracts have been fully executed."
-    });
-
-    setApplicationStatus('approved');
-    alert("Application successfully approved! The plot has been secured.");
+    const isOwner = activeConvo.plotOwnerId === currentUser.id;
+    
+    if (isOwner) {
+      await supabase.from('applications').update({ 
+        owner_signature: signatureInput,
+        status: 'awaiting_signature'
+      }).eq('id', applicationId);
+      
+      await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        recipient_id: activeConvo.otherUserId,
+        plot_id: activeConvo.plotId,
+        body: "SYSTEM: Revocable License drafted and signed by Owner. Waiting for Gardener to review and sign."
+      });
+      
+      setApplicationStatus('awaiting_signature');
+      setApplicationData({ ...applicationData, owner_signature: signatureInput });
+      alert("Contract drafted successfully. Waiting for Gardener to sign.");
+    } else {
+      await supabase.from('applications').update({ 
+        gardener_signature: signatureInput,
+        license_agreed_at: new Date().toISOString(),
+        status: 'approved'
+      }).eq('id', applicationId);
+      
+      await supabase.from('plots').update({ status: 'occupied' }).eq('id', activeConvo.plotId);
+      
+      await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        recipient_id: activeConvo.otherUserId,
+        plot_id: activeConvo.plotId,
+        body: "SYSTEM: Revocable License Signed! The plot is now yours to farm. Contracts have been fully executed."
+      });
+      
+      setApplicationStatus('approved');
+      alert("Contract signed! The plot is now yours.");
+    }
+    
+    setIsLicenseModalOpen(false);
+    setSignatureInput("");
   };
 
   const renderPills = (arr: string[]) => {
@@ -175,6 +206,55 @@ export default function InboxPage() {
       <Sidebar />
       <main className="main-content" style={{ padding: 0, display: "flex", flexDirection: "column" }}>
         
+        {/* Revocable License Modal */}
+        {isLicenseModalOpen && (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }}>
+            <div className="card fade-up" style={{ width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
+              <button 
+                onClick={() => setIsLicenseModalOpen(false)}
+                style={{ position: "absolute", top: 16, right: 16, background: "transparent", border: "none", fontSize: "1.2rem", cursor: "pointer", color: "var(--color-muted)" }}
+              >
+                ✕
+              </button>
+              
+              <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: 20, marginBottom: 20 }}>
+                <h2 style={{ marginBottom: 8 }}>Revocable Agricultural License</h2>
+                <span className="badge badge-green" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <span>⚖️</span> Legally Binding Agreement
+                </span>
+              </div>
+
+              <div style={{ fontSize: "0.9rem", lineHeight: 1.7, color: "var(--text-secondary)", marginBottom: 24, padding: "20px", background: "var(--bg-muted)", borderRadius: "8px" }}>
+                <p style={{ marginBottom: 12 }}><strong>1. Nature of Agreement:</strong> This agreement constitutes a Revocable License, not a lease. The Licensee (Gardener) acquires no tenancy rights, leasehold interests, or adverse possession claims to the Licensor's (Homeowner's) property.</p>
+                <p style={{ marginBottom: 12 }}><strong>2. Right of Revocation:</strong> The Licensor retains full control over the property and may revoke this license at any time, for any reason, immediately terminating the Licensee's access.</p>
+                <p style={{ marginBottom: 12 }}><strong>3. Assumption of Risk:</strong> The Licensee assumes all risk of injury or property damage arising from their activities on the property and explicitly waives any liability claims against the Licensor.</p>
+                <p><strong>4. Scope of Access:</strong> Access is granted solely for the purpose of gardening the designated plot. The Licensee must adhere to all ground rules specified by the Licensor in the plot listing.</p>
+              </div>
+
+              {applicationData?.owner_signature && (
+                <div style={{ marginBottom: 24, padding: "16px", background: "var(--brand-green-pale)", border: "1px solid var(--brand-green)", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.8rem", textTransform: "uppercase", fontWeight: 600, color: "var(--brand-green)", marginBottom: 4 }}>Homeowner Signature (Licensor)</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "1.1rem" }}>{applicationData.owner_signature}</div>
+                </div>
+              )}
+
+              <div className="field">
+                <label>Type your full legal name to agree to these terms:</label>
+                <input className="input" placeholder="Legal Name" value={signatureInput} onChange={(e) => setSignatureInput(e.target.value)} />
+              </div>
+
+              <button 
+                className="btn btn-primary" 
+                style={{ width: "100%", marginTop: 24 }} 
+                disabled={!signatureInput.trim()} 
+                onClick={handleSignContract}
+              >
+                {activeConvo?.plotOwnerId === currentUser?.id ? "Sign & Draft Contract" : "Sign & Finalize"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Gardener Resume Modal */}
         {isResumeOpen && gardenerSurvey && (
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }}>
@@ -295,9 +375,17 @@ export default function InboxPage() {
                 </div>
                 <div className="flex gap-8">
                   {activeConvo.plotOwnerId === currentUser?.id && applicationStatus === 'pending' && (
-                    <button className="btn btn-sm" style={{ background: "var(--brand-green)", color: "white" }} onClick={handleAcceptGardener}>
-                      ✓ Accept Gardener
+                    <button className="btn btn-sm" style={{ background: "var(--brand-green)", color: "white" }} onClick={() => setIsLicenseModalOpen(true)}>
+                      📝 Draft Contract
                     </button>
+                  )}
+                  {activeConvo.plotOwnerId !== currentUser?.id && applicationStatus === 'awaiting_signature' && (
+                    <button className="btn btn-sm" style={{ background: "var(--brand-green)", color: "white" }} onClick={() => setIsLicenseModalOpen(true)}>
+                      ✍️ Review & Sign License
+                    </button>
+                  )}
+                  {activeConvo.plotOwnerId === currentUser?.id && applicationStatus === 'awaiting_signature' && (
+                    <span className="badge" style={{ background: "var(--bg-muted)", color: "var(--color-muted)" }}>Waiting for Gardener Signature</span>
                   )}
                   {gardenerSurvey && (
                     <button className="btn btn-secondary btn-sm" onClick={() => setIsResumeOpen(true)}>
@@ -307,7 +395,6 @@ export default function InboxPage() {
                   {applicationStatus === 'approved' && (
                     <span className="badge badge-green">Contract Active</span>
                   )}
-                  <button className="btn btn-secondary btn-sm" onClick={() => router.push("/dashboard/contracts/sign")}>View Agreement</button>
                 </div>
               </div>
 

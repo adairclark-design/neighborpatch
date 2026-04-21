@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Use non-null assertions (!) because we will enforce they exist in Vercel
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Provide fallback strings during the build step so Next.js doesn't crash if Vercel is missing the keys
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://stub-project.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "stub-key";
 
 // Initialize the single shared browser/client-side Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

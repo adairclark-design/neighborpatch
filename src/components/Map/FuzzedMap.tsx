@@ -28,12 +28,22 @@ export default function FuzzedMap() {
   useEffect(() => {
     // Fetch live fuzzed plots from DB
     const fetchPlots = async () => {
-      const { data, error } = await supabase.from('plots').select('id, title, utility_fee_monthly, status, fuzzed_location').in('status', ['available']);
+      // 1. Get user Pro status
+      const { data: { user } } = await supabase.auth.getUser();
+      let isPro = false;
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('is_pro').eq('id', user.id).single();
+        isPro = profile?.is_pro || false;
+      }
+
+      // 2. Fetch plots
+      const { data, error } = await supabase.from('plots').select('id, title, utility_fee_monthly, status, fuzzed_location, created_at').in('status', ['available']);
       if (error || !data) return;
 
+      const now = new Date().getTime();
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
       const livePlots: Plot[] = data.map((plot) => {
-        // PostGIS usually returns a GeoJSON geometry object for Point types: { coordinates: [lng, lat] }
-        // If it isn't set, we skip or use fallback.
         const coords = (plot.fuzzed_location as any)?.coordinates;
         return {
           id: plot.id,
@@ -41,9 +51,15 @@ export default function FuzzedMap() {
           fuzzed_lng: coords ? coords[0] : 0,
           fuzzed_lat: coords ? coords[1] : 0,
           monthly_fee: plot.utility_fee_monthly || 0,
-          is_verified: true, // we will pull this from profiles relation later 
+          is_verified: true, 
+          created_at: new Date(plot.created_at).getTime()
         };
-      }).filter(p => p.fuzzed_lng !== 0);
+      }).filter(p => p.fuzzed_lng !== 0).filter(p => {
+        // Scarcity Logic: If the plot is less than 24 hours old, only Pro users can see it
+        const age = now - p.created_at;
+        if (age < ONE_DAY_MS && !isPro) return false;
+        return true;
+      });
       
       setPlots(livePlots);
     };
@@ -97,7 +113,13 @@ export default function FuzzedMap() {
         map.current?.on('click', `circle-${plot.id}`, (e) => {
           new mapboxgl.Popup()
             .setLngLat(e.lngLat)
-            .setHTML(`<strong>${plot.title}</strong><br/>${plot.monthly_fee === 0 ? "Crop Share" : "$" + plot.monthly_fee + "/mo"}`)
+            .setHTML(`
+              <div style="font-family: inherit;">
+                <strong style="display:block;margin-bottom:4px;font-size:1rem;">${plot.title}</strong>
+                <span style="color:#64748b;font-size:0.9rem;">${plot.monthly_fee === 0 ? "Crop Share" : "$" + plot.monthly_fee + "/mo"}</span>
+                <a href="/dashboard/plot/${plot.id}/apply" style="display:block;margin-top:12px;padding:6px 12px;background:var(--brand-green);color:white;text-decoration:none;border-radius:6px;text-align:center;font-weight:600;font-size:0.9rem;">Apply to Farm</a>
+              </div>
+            `)
             .addTo(map.current!);
         });
         

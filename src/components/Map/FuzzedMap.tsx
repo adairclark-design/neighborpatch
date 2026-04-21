@@ -17,6 +17,9 @@ interface Plot {
   fuzzed_lng: number;
   monthly_fee: number;
   is_verified: boolean;
+  water_provided: boolean;
+  organic_strict: boolean;
+  has_chickens: boolean;
 }
 
 export default function FuzzedMap() {
@@ -37,7 +40,7 @@ export default function FuzzedMap() {
       }
 
       // 2. Fetch plots
-      const { data, error } = await supabase.from('plots').select('id, title, utility_fee_monthly, status, fuzzed_location, created_at').in('status', ['available']);
+      const { data, error } = await supabase.from('plots').select('id, title, utility_fee_monthly, status, fuzzed_location, created_at, water_provided, organic_strict, has_chickens').in('status', ['available']);
       if (error || !data) return;
 
       const now = new Date().getTime();
@@ -52,7 +55,10 @@ export default function FuzzedMap() {
           fuzzed_lat: coords ? coords[1] : 0,
           monthly_fee: plot.utility_fee_monthly || 0,
           is_verified: true, 
-          created_at: new Date(plot.created_at).getTime()
+          created_at: new Date(plot.created_at).getTime(),
+          water_provided: plot.water_provided || false,
+          organic_strict: plot.organic_strict || false,
+          has_chickens: plot.has_chickens || false
         };
       }).filter(p => p.fuzzed_lng !== 0).filter(p => {
         // Scarcity Logic: If the plot is less than 24 hours old, only Pro users can see it
@@ -111,12 +117,19 @@ export default function FuzzedMap() {
 
         // Add a click handler to the circle to act as a marker
         map.current?.on('click', `circle-${plot.id}`, (e) => {
+          
+          let badgesHTML = "";
+          if (plot.organic_strict) badgesHTML += `<span style="display:inline-block;padding:2px 6px;background:#dcfce7;color:#166534;border-radius:4px;font-size:0.7rem;margin-right:4px;font-weight:600;">🌿 100% Organic</span>`;
+          if (plot.water_provided) badgesHTML += `<span style="display:inline-block;padding:2px 6px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:0.7rem;margin-right:4px;font-weight:600;">💧 Water Provided</span>`;
+          if (plot.has_chickens) badgesHTML += `<span style="display:inline-block;padding:2px 6px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:0.7rem;margin-right:4px;font-weight:600;">🐔 Poultry On-Site</span>`;
+
           new mapboxgl.Popup()
             .setLngLat(e.lngLat)
             .setHTML(`
               <div style="font-family: inherit;">
                 <strong style="display:block;margin-bottom:4px;font-size:1rem;">${plot.title}</strong>
                 <span style="color:#64748b;font-size:0.9rem;">${plot.monthly_fee === 0 ? "Crop Share" : "$" + plot.monthly_fee + "/mo"}</span>
+                <div style="margin-top:8px;margin-bottom:4px;">${badgesHTML}</div>
                 <a href="/dashboard/plot/${plot.id}/apply" style="display:block;margin-top:12px;padding:6px 12px;background:var(--brand-green);color:white;text-decoration:none;border-radius:6px;text-align:center;font-weight:600;font-size:0.9rem;">Apply to Farm</a>
               </div>
             `)

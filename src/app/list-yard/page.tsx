@@ -13,6 +13,13 @@ export default function ListYardPage() {
   const [model, setModel] = useState<"crop_share" | "flat_fee">("crop_share");
   const [interaction, setInteraction] = useState<"collaborative" | "silent">("collaborative");
   const [rules, setRules] = useState("");
+  
+  // New Phase 9 Plot Profiles
+  const [waterProvided, setWaterProvided] = useState(false);
+  const [organicStrict, setOrganicStrict] = useState(false);
+  const [hasChickens, setHasChickens] = useState(false);
+  const [willingToTeachChickens, setWillingToTeachChickens] = useState(false);
+  
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +62,10 @@ export default function ListYardPage() {
         description: rules,
         compensation_model: model,
         interaction_preference: interaction,
+        water_provided: waterProvided,
+        organic_strict: organicStrict,
+        has_chickens: hasChickens,
+        willing_to_teach_chickens: willingToTeachChickens,
         status: "available",
         exact_location: exact_wkt,
         fuzzed_location: fuzzed_wkt
@@ -168,7 +179,49 @@ export default function ListYardPage() {
 
                   <div className="field mb-24">
                     <label>Ground Rules (Optional)</label>
-                    <textarea className="input" placeholder="No synthetic pesticides, lock the side gate when leaving, organic fertilizers only..." value={rules} onChange={e => setRules(e.target.value)} />
+                    <textarea className="input" placeholder="Lock the side gate when leaving..." value={rules} onChange={e => setRules(e.target.value)} />
+                  </div>
+
+                  {/* Phase 9 Plot Badges */}
+                  <div className="card" style={{ background: "var(--bg-muted)", marginBottom: 24 }}>
+                    <h4 className="mb-16">Ecosystem Guarantees</h4>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      <label style={{ display: "flex", gap: "12px", alignItems: "flex-start", cursor: "pointer" }}>
+                        <input type="checkbox" checked={waterProvided} onChange={e => setWaterProvided(e.target.checked)} style={{ width: 18, height: 18, marginTop: 2, accentColor: "var(--brand-green)", flexShrink: 0 }} />
+                        <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>
+                          <strong style={{ color: "var(--brand-green)" }}>Water Provided</strong><br />
+                          <span className="text-sm color-muted font-normal">I will provide access to a hose or drip irrigation.</span>
+                        </span>
+                      </label>
+
+                      <label style={{ display: "flex", gap: "12px", alignItems: "flex-start", cursor: "pointer" }}>
+                        <input type="checkbox" checked={organicStrict} onChange={e => setOrganicStrict(e.target.checked)} style={{ width: 18, height: 18, marginTop: 2, accentColor: "var(--brand-green)", flexShrink: 0 }} />
+                        <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>
+                          <strong style={{ color: "var(--brand-green)" }}>100% Organic Zone</strong><br />
+                          <span className="text-sm color-muted font-normal">No synthetic pesticides or herbicides allowed on my property.</span>
+                        </span>
+                      </label>
+
+                      <label style={{ display: "flex", gap: "12px", alignItems: "flex-start", cursor: "pointer" }}>
+                        <input type="checkbox" checked={hasChickens} onChange={e => {
+                          setHasChickens(e.target.checked);
+                          if (!e.target.checked) setWillingToTeachChickens(false);
+                        }} style={{ width: 18, height: 18, marginTop: 2, accentColor: "var(--brand-green)", flexShrink: 0 }} />
+                        <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>
+                          <strong style={{ color: "var(--brand-green)" }}>Poultry On-Site</strong><br />
+                          <span className="text-sm color-muted font-normal">I have backyard chickens or quail.</span>
+                        </span>
+                      </label>
+
+                      {hasChickens && (
+                        <label style={{ display: "flex", gap: "12px", alignItems: "flex-start", cursor: "pointer", marginLeft: 30 }}>
+                          <input type="checkbox" checked={willingToTeachChickens} onChange={e => setWillingToTeachChickens(e.target.checked)} style={{ width: 18, height: 18, marginTop: 2, accentColor: "var(--brand-green)", flexShrink: 0 }} />
+                          <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>
+                            I am willing to teach my gardener how to care for them.
+                          </span>
+                        </label>
+                      )}
+                    </div>
                   </div>
 
                   <button className="btn btn-primary btn-full" disabled={!address || !title || loading} onClick={handleSubmit} style={{ opacity: !address || !title ? 0.5 : 1 }}>

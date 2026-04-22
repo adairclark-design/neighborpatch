@@ -20,9 +20,12 @@ interface Plot {
   water_provided: boolean;
   organic_strict: boolean;
   has_chickens: boolean;
+interface FuzzedMapProps {
+  height?: string;
+  borderRadius?: string;
 }
 
-export default function FuzzedMap() {
+export default function FuzzedMap({ height = "400px", borderRadius = "var(--radius-md)" }: FuzzedMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   
@@ -147,7 +150,7 @@ export default function FuzzedMap() {
   });
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "400px", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+    <div style={{ position: "relative", width: "100%", height, borderRadius, overflow: "hidden" }}>
       <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
       <div style={{ position: "absolute", top: 10, left: 10, background: "white", padding: "8px 12px", borderRadius: "100px", fontSize: "0.8rem", boxShadow: "var(--shadow-md)" }}>
         📍 Showing {plots.length} available plot{plots.length === 1 ? "" : "s"} near {plots.length > 0 ? "your area" : "you"}

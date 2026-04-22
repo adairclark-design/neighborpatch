@@ -52,7 +52,7 @@ export default function Home() {
                 Your tomatoes are hitting week 3. The Millers left you a harvest log note — and 2 new plots opened up near you.
               </p>
               <div className="flex gap-12 mt-16" style={{ flexWrap: "wrap" }}>
-                <button className="btn btn-primary" onClick={() => setActiveTab("browse")}>Browse New Plots</button>
+                <button className="btn btn-primary" onClick={() => router.push("/explore")}>Browse New Plots</button>
                 <button
                   className="btn"
                   style={{ background: "hsla(0,0%,100%,0.15)", color: "white", backdropFilter: "blur(4px)" }}
@@ -184,54 +184,7 @@ export default function Home() {
           </>
         )}
 
-        {/* === BROWSE TAB === */}
-        {activeTab === "browse" && (
-          <>
-            <div className="page-header fade-up">
-              <div className="page-header-text">
-                <h2>Available Plots Near You</h2>
-                <p>4 plots within 3 miles of Austin, TX. All owners are background-checked.</p>
-              </div>
-              <button className="btn btn-secondary" onClick={() => setActiveTab("overview")}>← Back to Overview</button>
-            </div>
-
-            <div className="grid-2 fade-up fade-up-1">
-              {MOCK_PLOTS.map((plot) => (
-                <div key={plot.id} className="plot-card" onClick={() => router.push("/onboarding/gardener")}>
-                  <div className="plot-card-img">
-                    <span>{plot.emoji}</span>
-                    <span className="plot-distance">{plot.distance}</span>
-                  </div>
-                  <div className="plot-card-body">
-                    <div className="plot-card-title">{plot.title}</div>
-                    <div className="plot-card-meta">
-                      {plot.verified && <span className="badge badge-green">✓ Verified Owner</span>}
-                      <span className="badge badge-neutral">{plot.sqft} sq ft</span>
-                      {plot.tags.slice(0,1).map(t => <span key={t} className="badge badge-earth">{t}</span>)}
-                    </div>
-                    <div className="text-sm color-secondary" style={{ marginBottom: 4 }}>
-                      {plot.tags.slice(1).join(" · ")}
-                    </div>
-                    <div className="plot-card-footer">
-                      <div className="plot-price">
-                        {plot.price ? <>$<span style={{ fontSize: "1rem", fontWeight: 800 }}>{plot.price}</span><span>/mo</span></> : <span style={{ color: "var(--brand-earth)", fontWeight: 700 }}>🧺 Crop Share</span>}
-                      </div>
-                      <button className="btn btn-primary btn-sm">Apply</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="card mt-24 fade-up fade-up-2" style={{ textAlign: "center", padding: "40px" }}>
-              <div style={{ fontSize: "2rem", marginBottom: "12px" }}>🏡</div>
-              <h3 className="mb-8">Have a yard you're not using?</h3>
-              <p className="text-sm" style={{ maxWidth: 380, margin: "0 auto 20px" }}>Turn that unused patch of grass into a local food source — and get fresh produce on your doorstep every week.</p>
-              <button className="btn btn-secondary" onClick={() => router.push("/list-yard")}>List My Yard for Free</button>
-            </div>
-          </>
-        )}
-
+        {/* Note: The old BROWSE tab has been deprecated in favor of the full-bleed /explore route */}
       </main>
     </div>
   );

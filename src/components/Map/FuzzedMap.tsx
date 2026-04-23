@@ -20,6 +20,8 @@ interface Plot {
   water_provided: boolean;
   organic_strict: boolean;
   has_chickens: boolean;
+}
+
 interface FuzzedMapProps {
   height?: string;
   borderRadius?: string;

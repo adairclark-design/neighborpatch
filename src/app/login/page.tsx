@@ -23,8 +23,13 @@ function LoginContent() {
         if (error) throw error;
         alert("Check your email to confirm registration!");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        
+        if (data.session) {
+          document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax; secure`;
+        }
+
         router.push(redirectTo);
       }
     } catch (err: any) {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SupabaseAuthSync from "@/components/SupabaseAuthSync";
 
 export const metadata: Metadata = {
   title: "NeighborPatch — Share Your Yard, Grow Together",
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <SupabaseAuthSync />
+        {children}
+      </body>
     </html>
   );
 }
